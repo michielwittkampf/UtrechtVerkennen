@@ -1,6 +1,6 @@
 package com.example.utrechtverkennen.model
 
-enum class LocationType(val title: String) {
+enum class LocationCategory(val title: String) {
     COFFEE_SHOP("Koffiezaken"),
     RESTAURANT("Restaurants"),
     SHOPPING_AREA("Winkelen"),

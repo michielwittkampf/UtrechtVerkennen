@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">Utrecht Verkennen</string>
+    <string name="app_title">Utrecht</string>
+    <string name="back_button">Back button</string>
 </resources>

@@ -1,7 +1,7 @@
 package com.example.utrechtverkennen.ui
 
 enum class LayoutType {
-    SEPARATE_SCREENS,
-    COMBINE_PLACES_AND_DETAILS,
-    COMBINE_CATEGORIES_PLACES_AND_DETAILS,
+    ALL_SEPARATE_SCREENS,
+    MODAL_FOR_LOCATION_CATEGORIES,
+    ALL_IN_ONE,
 }

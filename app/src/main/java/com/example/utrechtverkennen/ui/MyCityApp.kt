@@ -1,4 +1,4 @@
-package com.example.utrechtontdekker.ui
+package com.example.utrechtverkennen.ui
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -12,6 +12,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
@@ -20,9 +25,13 @@ import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.PermanentDrawerSheet
 import androidx.compose.material3.PermanentNavigationDrawer
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
 import androidx.compose.material3.windowsizeclass.WindowSizeClass
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
+import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass.Companion.Compact
+import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass.Companion.Expanded
+import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass.Companion.Medium
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
@@ -36,76 +45,112 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.utrechtontdekker.R
-import com.example.utrechtontdekker.data.DataSource
-import com.example.utrechtontdekker.model.Location
-import com.example.utrechtontdekker.model.LocationType
-import com.example.utrechtontdekker.ui.LayoutType.COMBINE_CATEGORIES_PLACES_AND_DETAILS
-import com.example.utrechtontdekker.ui.theme.Typography
-import com.example.utrechtontdekker.ui.theme.UtrechtOntdekkerTheme
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import com.example.utrechtverkennen.R
+import com.example.utrechtverkennen.data.DataSource
+import com.example.utrechtverkennen.model.Location
+import com.example.utrechtverkennen.model.LocationCategory
+import com.example.utrechtverkennen.ui.LayoutType.ALL_IN_ONE
+import com.example.utrechtverkennen.ui.LayoutType.MODAL_FOR_LOCATION_CATEGORIES
+import com.example.utrechtverkennen.ui.LayoutType.ALL_SEPARATE_SCREENS
+import com.example.utrechtverkennen.ui.theme.Typography
+import com.example.utrechtverkennen.ui.theme.UtrechtverkennenTheme
 
 @Composable
 fun MyCityApp(
-    modifier: Modifier = Modifier,
     windowWidthSize: WindowWidthSizeClass,
-    onBackPressed: () -> Unit
+    modifier: Modifier = Modifier,
+    navController: NavHostController = rememberNavController(),
+    onBackPressed: () -> Unit = {},
 ) {
-    val images: Map<LocationType, Int> = DataSource.locationTypeImages
+    val images: Map<LocationCategory, Int> = DataSource.locationCategoryImages
 
     val viewModel: CityViewModel = viewModel()
     val uiState: CityUiState = viewModel.uiState.collectAsState().value
 
     val layout = determineLayout(windowWidthSize)
 
-    if (layout == COMBINE_CATEGORIES_PLACES_AND_DETAILS) {
-        AdaptiveNavigationDrawer(
-            layout = layout,
-            selectedLocationType = uiState.selectedLocationType,
-            onSelectLocationType = { viewModel.setLocationType(it) },
-        ) {
+    AdaptiveNavigationDrawer(
+        layout = layout,
+        selectedLocationCategory = uiState.selectedLocationCategory,
+        onSelectLocationCategory = { viewModel.setLocationCategory(it) },
+    ) {
+        if (layout in setOf(ALL_IN_ONE, MODAL_FOR_LOCATION_CATEGORIES)) {
             Row(modifier) {
-                PlacesList(
+                LocationListPanel(
                     locations = uiState.filteredLocations,
                     modifier = Modifier
                         .width(400.dp),
                     selectedLocation = uiState.selectedLocation,
                     onSelectLocation = { viewModel.setLocation(it) },
                 )
-                PlaceDetails(
+                LocationDetailsPanel(
                     location = uiState.selectedLocation,
                     imageId = images[uiState.selectedLocation?.type],
                     modifier = Modifier
                         .fillMaxWidth()
                 )
             }
+        } else {
+            NavHost(
+                navController = navController,
+                startDestination = "locations-list"
+            ) {
+                composable("locations-list") {
+                    LocationListPanel(
+                        locations = uiState.filteredLocations,
+                        selectedLocation = uiState.selectedLocation,
+                        onSelectLocation = {
+                            viewModel.setLocation(it)
+                            navController.navigate("location-details")
+                        },
+                    )
+                }
+                composable("location-details") {
+                    LocationDetailsPanel(
+                        location = uiState.selectedLocation,
+                        imageId = DataSource.locationCategoryImages[uiState.selectedLocationCategory]
+                    )
+                }
+            }
         }
     }
 }
 
 fun determineLayout(windowWidthSize: WindowWidthSizeClass): LayoutType {
-    return COMBINE_CATEGORIES_PLACES_AND_DETAILS
+    return when (windowWidthSize) {
+        Compact -> ALL_SEPARATE_SCREENS
+        Medium -> MODAL_FOR_LOCATION_CATEGORIES
+        Expanded -> ALL_IN_ONE
+        else -> ALL_SEPARATE_SCREENS
+    }
 }
 
 @Composable
 fun AdaptiveNavigationDrawer(
     layout: LayoutType,
-    selectedLocationType: LocationType?,
-    onSelectLocationType: (LocationType) -> Unit,
+    selectedLocationCategory: LocationCategory?,
+    onSelectLocationCategory: (LocationCategory) -> Unit,
     content: @Composable () -> Unit,
 ) {
     val drawerWidth = 280.dp
     val drawerContainerColor = MaterialTheme.colorScheme.surfaceVariant
 
     when (layout) {
-        COMBINE_CATEGORIES_PLACES_AND_DETAILS -> {
+        ALL_IN_ONE -> {
             PermanentNavigationDrawer({
                 PermanentDrawerSheet(
                     modifier = Modifier.width(drawerWidth),
                     drawerContainerColor = drawerContainerColor,
-                ) { CategoriesDrawerContent(
-                    selectedLocationType = selectedLocationType,
-                    onSelectLocationType = onSelectLocationType,
-                ) }
+                ) {
+                    LocationCategoriesListPanel(
+                        selectedLocationCategory = selectedLocationCategory,
+                        onSelectLocationCategory = onSelectLocationCategory,
+                    )
+                }
             }
             ) { content() }
         }
@@ -115,10 +160,12 @@ fun AdaptiveNavigationDrawer(
                 ModalDrawerSheet(
                     modifier = Modifier.width(drawerWidth),
                     drawerContainerColor = drawerContainerColor,
-                ) { CategoriesDrawerContent(
-                    selectedLocationType = selectedLocationType,
-                    onSelectLocationType = onSelectLocationType,
-                ) }
+                ) {
+                    LocationCategoriesListPanel(
+                        selectedLocationCategory = selectedLocationCategory,
+                        onSelectLocationCategory = onSelectLocationCategory,
+                    )
+                }
             }
             ) { content() }
         }
@@ -126,10 +173,10 @@ fun AdaptiveNavigationDrawer(
 }
 
 @Composable
-fun CategoriesDrawerContent(
+fun LocationCategoriesListPanel(
+    selectedLocationCategory: LocationCategory?,
+    onSelectLocationCategory: (LocationCategory) -> Unit,
     modifier: Modifier = Modifier,
-    selectedLocationType: LocationType?,
-    onSelectLocationType: (LocationType) -> Unit,
 ) {
     Column(
         modifier = modifier
@@ -139,40 +186,78 @@ fun CategoriesDrawerContent(
         Header(
             text = stringResource(R.string.app_title),
         )
-        LocationType.entries.forEach { type ->
-            NavigationDrawerItem(
-                label = { Text(type.title) },
-                selected = (type == selectedLocationType),
-                onClick = { onSelectLocationType(type) },
-                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
-            )
-        }
+        LocationCategoriesList(selectedLocationCategory, onSelectLocationCategory)
     }
 }
 
 @Composable
-fun PlacesList(
+private fun LocationCategoriesList(
+    selectedLocationCategory: LocationCategory?,
+    onSelectLocationCategory: (LocationCategory) -> Unit
+) {
+    LocationCategory.entries.forEach { type ->
+        NavigationDrawerItem(
+            label = { Text(type.title) },
+            selected = (type == selectedLocationCategory),
+            onClick = { onSelectLocationCategory(type) },
+            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LocationListPanel(
     locations: List<Location>,
-    modifier: Modifier = Modifier,
-    selectedLocation: Location? = null,
+    selectedLocation: Location?,
     onSelectLocation: (Location) -> Unit,
+    modifier: Modifier = Modifier,
+    withTopBar: Boolean = true,
+    title: String = "",
+    onBackButtonClick: () -> Unit = {},
 ) {
     Column(
         modifier = modifier
             .padding(horizontal = 30.dp, vertical = 30.dp)
     ) {
-        Header()
-        locations.forEach {
-            LocationMenuItem(
-                location = it,
-                onSelectLocation = onSelectLocation,
-            )
+        if (withTopBar) {
+            AppTopBar(title, onBackButtonClick)
+        } else Header()
+        LocationList(locations, onSelectLocation)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AppTopBar(title: String, onBackButtonClick: () -> Unit) {
+    TopAppBar(
+        title = { PanelTitle(title) },
+        navigationIcon = {
+            IconButton(onClick = onBackButtonClick) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = stringResource(R.string.back_button)
+                )
+            }
         }
+    )
+}
+
+@Composable
+private fun LocationList(
+    locations: List<Location>,
+    onSelectLocation: (Location) -> Unit
+) {
+    locations.forEach {
+        LocationMenuItem(
+            location = it,
+            onSelectLocation = onSelectLocation,
+        )
     }
 }
 
 @Composable
-fun PlaceDetails(
+private fun LocationDetailsPanel(
     location: Location?,
     imageId: Int?,
     modifier: Modifier = Modifier,
@@ -186,27 +271,32 @@ fun PlaceDetails(
             Header(
                 text = location.displayName,
             )
-            if (imageId != null) {
-                Image(
-                    painter = painterResource(imageId),
-                    contentDescription = null,
-                    alignment = Alignment.TopCenter,
-                    contentScale = ContentScale.FillWidth,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 10.dp)
-                )
-            }
-            Text(
-                text = AnnotatedString.fromHtml(location.descriptionHtml),
-                style = Typography.bodyLarge,
-            )
+            LocationDetails(imageId, location)
         }
     }
 }
 
 @Composable
-fun Header(text: String? = null) {
+private fun LocationDetails(imageId: Int?, location: Location) {
+    if (imageId != null) {
+        Image(
+            painter = painterResource(imageId),
+            contentDescription = null,
+            alignment = Alignment.TopCenter,
+            contentScale = ContentScale.FillWidth,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 10.dp)
+        )
+    }
+    Text(
+        text = AnnotatedString.fromHtml(location.descriptionHtml),
+        style = Typography.bodyLarge,
+    )
+}
+
+@Composable
+private fun Header(text: String? = null) {
     Box(
         modifier = Modifier
             .height(80.dp)
@@ -215,12 +305,17 @@ fun Header(text: String? = null) {
         contentAlignment = Alignment.BottomStart
     ) {
         if (text != null) {
-            Text(
-                text = text,
-                style = Typography.displaySmall
-            )
+            PanelTitle(text)
         }
     }
+}
+
+@Composable
+private fun PanelTitle(text: String) {
+    Text(
+        text = text,
+        style = Typography.displaySmall
+    )
 }
 
 @Composable
@@ -246,7 +341,7 @@ fun LocationMenuItem(
 @Preview(device = "id:pixel_5", showBackground = true)
 @Composable
 fun MyCityAppPreview() {
-    UtrechtOntdekkerTheme {
+    UtrechtverkennenTheme {
         BoxWithConstraints {
             val windowSize = WindowSizeClass.calculateFromSize(DpSize(maxWidth, maxHeight))
             MyCityApp(
